@@ -14,7 +14,7 @@ export const VulnerableHtml = ({ content, className }: VulnerableHtmlProps) => {
       return;
     }
 
-    // Simula um renderer inseguro: injeta HTML e reexecuta <script> inline.
+
     container.innerHTML = content;
 
     const scripts = container.querySelectorAll('script');

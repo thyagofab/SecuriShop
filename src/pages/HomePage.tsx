@@ -44,6 +44,11 @@ const CATEGORIA_POR_NOME: Record<string, CatalogProduct['category']> = {
 
 const IMAGEM_PADRAO_PRODUTO = '/images.jpeg';
 
+const PRECO_REAL_POR_NOME: Record<string, string> = {
+  'Caderno Smart Notes 360': 'R$ 34,90',
+  'Caderno Study Planner Max': 'R$ 42,90'
+};
+
 const IMAGEM_POR_NOME_PRODUTO: Record<string, string> = {
   'Acer Nitro 5 - TCC Edition': '/acer-nitro-v15-06.avif',
   'Galaxy M13 4GB 64GB': '/celular1.webp',
@@ -163,10 +168,11 @@ const formatarProdutoCatalogo = (produto: Product, indice: number): CatalogProdu
   const descontoSelecionado = nomesComDesconto.has(produto.name)
     ? tabelaDescontos[indice % tabelaDescontos.length]
     : undefined;
+  const precoSelecionado = PRECO_REAL_POR_NOME[produto.name] ?? tabelaPrecos[indice % tabelaPrecos.length];
 
   return {
     ...produto,
-    price: tabelaPrecos[indice % tabelaPrecos.length],
+    price: precoSelecionado,
     oldPrice: descontoSelecionado?.oldPrice,
     savings: descontoSelecionado?.savings,
     discountLabel: descontoSelecionado?.discountLabel,

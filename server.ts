@@ -13,6 +13,7 @@ const adapter = new PrismaBetterSqlite3({
 const prisma = new PrismaClient({ adapter });
 const app = express();
 const sessoesPorToken = new Map<string, number>();
+const armazenamentoDemoXss = new Map<string, string[]>();
 
 app.use(cors());
 
@@ -71,6 +72,156 @@ const buscarUsuarioAutenticado = async (req: Request) => {
     select: { id: true, username: true }
   });
 };
+
+const criarPaginaVulneravel = (titulo: string, corpo: string) => {
+  return `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${titulo}</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+        line-height: 1.5;
+      }
+      .box {
+        max-width: 900px;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 24px;
+      }
+      code, pre {
+        background: #f6f8fa;
+        border-radius: 8px;
+        padding: 2px 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      ${corpo}
+    </div>
+  </body>
+</html>`;
+};
+
+const obterListaDemoXss = (chave: string) => {
+  if (!armazenamentoDemoXss.has(chave)) {
+    armazenamentoDemoXss.set(chave, []);
+  }
+
+  return armazenamentoDemoXss.get(chave)!;
+};
+
+const persistirDemoXss = (chave: string, payload?: string) => {
+  if (!payload) {
+    return;
+  }
+
+  const lista = obterListaDemoXss(chave);
+  lista.unshift(payload);
+  if (lista.length > 25) {
+    lista.length = 25;
+  }
+};
+
+const montarItensDemoXss = (chave: string, autor: string) => {
+  return obterListaDemoXss(chave)
+    .map((payload) => `<li><strong>${autor}</strong>: <span>${payload}</span></li>`)
+    .join('\n');
+};
+
+const formatarComentariosEmHtml = async (productId?: string) => {
+  const filtro = productId ? Number(productId) : undefined;
+  const comments = await prisma.comment.findMany({
+    where: Number.isFinite(filtro) ? { productId: filtro } : undefined,
+    include: {
+      user: {
+        select: {
+          id: true,
+          username: true
+        }
+      }
+    },
+    orderBy: { id: 'desc' }
+  });
+
+  const itens = comments
+    .map((comment) => {
+      return `<li><strong>${comment.user.username}</strong>: <span>${comment.content}</span></li>`;
+    })
+    .join('\n');
+
+  return criarPaginaVulneravel(
+    'Comentarios vulneraveis',
+    `<h1>Comentarios renderizados sem sanitizacao</h1>
+     <p>Endpoint didatico para demonstrar XSS armazenado em HTML.</p>
+     <ul>${itens || '<li>Nenhum comentario encontrado.</li>'}</ul>`
+  );
+};
+
+app.get('/demo/xss/search', async (req: Request, res: Response) => {
+  const termo = String(req.query.q ?? 'busca vazia');
+  const pagina = criarPaginaVulneravel(
+    'Busca vulneravel',
+    `<h1>Resultado da busca</h1>
+     <p>Voce pesquisou por: ${termo}</p>
+     <p>Esse campo e refletido diretamente no HTML para fins didaticos.</p>`
+  );
+
+  res.type('html').send(pagina);
+});
+
+app.get('/demo/xss/reflected', async (req: Request, res: Response) => {
+  const payload = String(req.query.payload ?? req.query.q ?? 'valor-vazio');
+  const pagina = criarPaginaVulneravel(
+    'Reflected XSS demo',
+    `<h1>Reflected XSS</h1>
+     <p>Entrada refletida sem sanitizacao:</p>
+     <div id="resultado">${payload}</div>`
+  );
+
+  res.type('html').send(pagina);
+});
+
+app.get('/demo/xss/stored', async (req: Request, res: Response) => {
+  const chave = String(req.query.key ?? req.query.productId ?? 'default');
+  const payload = req.query.payload ? String(req.query.payload) : undefined;
+
+  persistirDemoXss(chave, payload);
+
+  const itens = montarItensDemoXss(chave, 'Visitante');
+  const pagina = criarPaginaVulneravel(
+    'Stored XSS demo',
+    `<h1>Stored XSS</h1>
+     <p>Payload persistido em memoria e exibido sem sanitizacao.</p>
+     <ul>${itens || '<li>Nenhum payload armazenado.</li>'}</ul>`
+  );
+
+  res.type('html').send(pagina);
+});
+
+app.get('/demo/xss/dom', async (_req: Request, res: Response) => {
+  const pagina = criarPaginaVulneravel(
+    'DOM XSS demo',
+    `<h1>DOM-based XSS</h1>
+     <p>Use um payload no hash da URL (apos #).</p>
+     <div id="dom-target">Aguardando hash...</div>
+     <script>
+       const hash = window.location.hash.slice(1);
+       document.getElementById('dom-target').innerHTML = hash || 'Sem payload';
+     </script>`
+  );
+
+  res.type('html').send(pagina);
+});
+
+app.get('/demo/xss/comments', async (req: Request, res: Response) => {
+  const pagina = await formatarComentariosEmHtml(String(req.query.productId ?? ''));
+  res.type('html').send(pagina);
+});
 
 app.get('/api/products', async (_req: Request, res: Response) => {
   try {
