@@ -6,6 +6,7 @@ import {
   CHAVE_USUARIO_LOCALSTORAGE
 } from '../config/auth';
 import type { Usuario } from '../types/domain';
+import { useSecurityMode } from '../context/SecurityModeContext';
 
 export const useAuthSession = () => {
   const [usuarioLogado, setUsuarioLogado] = useState<Usuario | null>(() => {
@@ -24,6 +25,7 @@ export const useAuthSession = () => {
     () => localStorage.getItem(CHAVE_TOKEN_LOCALSTORAGE) ?? ''
   );
   const [carregandoSessao, setCarregandoSessao] = useState(() => Boolean(tokenSessao));
+  const { isSecureMode } = useSecurityMode();
 
   useEffect(() => {
     if (!tokenSessao) {
@@ -34,8 +36,10 @@ export const useAuthSession = () => {
       try {
         const resposta = await fetch(`${API_BASE}/auth/me`, {
           headers: {
-            Authorization: `Bearer ${tokenSessao}`
-          }
+            Authorization: `Bearer ${tokenSessao}`,
+            'X-Secure-Mode': isSecureMode ? 'true' : 'false'
+          },
+          credentials: 'include'
         });
 
         if (!resposta.ok) {
@@ -49,8 +53,10 @@ export const useAuthSession = () => {
         }
 
         const dados = (await resposta.json()) as { user: Usuario };
-        // Mantem cookie inseguro sincronizado para demonstracao de XSS.
-        document.cookie = `${CHAVE_COOKIE_SESSAO}=${encodeURIComponent(tokenSessao)}; path=/; SameSite=Lax`;
+        if (!isSecureMode) {
+          // Mantem cookie inseguro sincronizado para demonstracao de XSS.
+          document.cookie = `${CHAVE_COOKIE_SESSAO}=${encodeURIComponent(tokenSessao)}; path=/; SameSite=Lax`;
+        }
         setUsuarioLogado(dados.user);
         localStorage.setItem(CHAVE_USUARIO_LOCALSTORAGE, JSON.stringify(dados.user));
       } catch {
@@ -61,12 +67,14 @@ export const useAuthSession = () => {
     };
 
     void carregarSessao();
-  }, [tokenSessao]);
+  }, [tokenSessao, isSecureMode]);
 
   const logout = () => {
     localStorage.removeItem(CHAVE_TOKEN_LOCALSTORAGE);
     localStorage.removeItem(CHAVE_USUARIO_LOCALSTORAGE);
-    document.cookie = `${CHAVE_COOKIE_SESSAO}=; path=/; Max-Age=0; SameSite=Lax`;
+    if (!isSecureMode) {
+      document.cookie = `${CHAVE_COOKIE_SESSAO}=; path=/; Max-Age=0; SameSite=Lax`;
+    }
     setTokenSessao('');
     setUsuarioLogado(null);
     setCarregandoSessao(false);

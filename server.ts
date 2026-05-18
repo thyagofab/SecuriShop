@@ -3,9 +3,11 @@ import express, { type Request, type Response } from 'express';
 import prismaPkg from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import cors from 'cors';
+import helmet from 'helmet';
 import morgan from 'morgan';
+import xss from 'xss';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
-import { resetCommentsOnly, seedDatabase } from './prisma/seedData';
+import { resetCommentsOnly } from './prisma/seedData';
 
 const { PrismaClient } = prismaPkg;
 
@@ -23,6 +25,18 @@ const XSS_DEMO_ENABLED =
   !process.env.ENABLE_XSS_DEMO ||
   !['false', '0', 'off'].includes(process.env.ENABLE_XSS_DEMO.toLowerCase());
 
+const politicaCsp = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'", CLIENT_ORIGIN]
+    }
+  }
+});
+
 const permitirOrigem = (origin: string | undefined) => {
   if (!origin) {
     return true;
@@ -39,12 +53,32 @@ app.use(
   cors({
     origin: (origin, callback) => {
       callback(null, permitirOrigem(origin));
-    }
+    },
+    credentials: true
   })
 );
 
 app.use(express.json());
 app.use(morgan('dev'));
+
+app.use((req, res, next) => {
+  const headerModoSeguro = req.header('x-secure-mode');
+  const isSecureMode = headerModoSeguro
+    ? !['false', '0', 'off'].includes(headerModoSeguro.toLowerCase())
+    : !XSS_DEMO_ENABLED;
+
+  res.locals.isSecureMode = isSecureMode;
+  next();
+});
+
+app.use((req, res, next) => {
+  if (!res.locals.isSecureMode) {
+    next();
+    return;
+  }
+
+  politicaCsp(req, res, next);
+});
 
 if (XSS_DEMO_ENABLED) {
   app.use((req, _res, next) => {
@@ -109,6 +143,18 @@ const buscarUsuarioAutenticado = async (req: Request) => {
   });
 };
 
+const configurarCookieSessao = (req: Request, res: Response, token: string) => {
+  const isSecureMode = Boolean(res.locals.isSecureMode);
+  const isHttps = req.secure || req.header('x-forwarded-proto') === 'https';
+
+  res.cookie('session', token, {
+    httpOnly: isSecureMode,
+    secure: isSecureMode ? isHttps : false,
+    sameSite: isSecureMode ? 'strict' : 'lax',
+    path: '/'
+  });
+};
+
 const criarPaginaVulneravel = (titulo: string, corpo: string) => {
   return `<!doctype html>
 <html lang="pt-BR">
@@ -151,13 +197,14 @@ const obterListaDemoXss = (chave: string) => {
   return armazenamentoDemoXss.get(chave)!;
 };
 
-const persistirDemoXss = (chave: string, payload?: string) => {
+const persistirDemoXss = (chave: string, payload?: string, isSecureMode = false) => {
   if (!payload) {
     return;
   }
 
   const lista = obterListaDemoXss(chave);
-  lista.unshift(payload);
+  const conteudo = isSecureMode ? xss(payload) : payload;
+  lista.unshift(conteudo);
   if (lista.length > 25) {
     lista.length = 25;
   }
@@ -169,7 +216,7 @@ const montarItensDemoXss = (chave: string, autor: string) => {
     .join('\n');
 };
 
-const formatarComentariosEmHtml = async (productId?: string) => {
+const formatarComentariosEmHtml = async (productId?: string, isSecureMode = false) => {
   const filtro = productId ? Number(productId) : undefined;
   const comments = await prisma.comment.findMany({
     where: Number.isFinite(filtro) ? { productId: filtro } : undefined,
@@ -186,7 +233,9 @@ const formatarComentariosEmHtml = async (productId?: string) => {
 
   const itens = comments
     .map((comment) => {
-      return `<li><strong>${comment.user.username}</strong>: <span>${comment.content}</span></li>`;
+      const usuario = isSecureMode ? xss(comment.user.username) : comment.user.username;
+      const conteudo = isSecureMode ? xss(comment.content) : comment.content;
+      return `<li><strong>${usuario}</strong>: <span>${conteudo}</span></li>`;
     })
     .join('\n');
 
@@ -200,11 +249,13 @@ const formatarComentariosEmHtml = async (productId?: string) => {
 
 if (XSS_DEMO_ENABLED) {
   app.get('/demo/xss/search', async (req: Request, res: Response) => {
+    const isSecureMode = Boolean(res.locals.isSecureMode);
     const termo = String(req.query.q ?? 'busca vazia');
+    const termoSeguro = isSecureMode ? xss(termo) : termo;
     const pagina = criarPaginaVulneravel(
       'Busca vulneravel',
       `<h1>Resultado da busca</h1>
-       <p>Voce pesquisou por: ${termo}</p>
+       <p>Voce pesquisou por: ${termoSeguro}</p>
        <p>Esse campo e refletido diretamente no HTML para fins didaticos.</p>`
     );
 
@@ -212,22 +263,25 @@ if (XSS_DEMO_ENABLED) {
   });
 
   app.get('/demo/xss/reflected', async (req: Request, res: Response) => {
+    const isSecureMode = Boolean(res.locals.isSecureMode);
     const payload = String(req.query.payload ?? req.query.q ?? 'valor-vazio');
+    const payloadSeguro = isSecureMode ? xss(payload) : payload;
     const pagina = criarPaginaVulneravel(
       'Reflected XSS demo',
       `<h1>Reflected XSS</h1>
        <p>Entrada refletida sem sanitizacao:</p>
-       <div id="resultado">${payload}</div>`
+       <div id="resultado">${payloadSeguro}</div>`
     );
 
     res.type('html').send(pagina);
   });
 
   app.get('/demo/xss/stored', async (req: Request, res: Response) => {
+    const isSecureMode = Boolean(res.locals.isSecureMode);
     const chave = String(req.query.key ?? req.query.productId ?? 'default');
     const payload = req.query.payload ? String(req.query.payload) : undefined;
 
-    persistirDemoXss(chave, payload);
+    persistirDemoXss(chave, payload, isSecureMode);
 
     const itens = montarItensDemoXss(chave, 'Visitante');
     const pagina = criarPaginaVulneravel(
@@ -256,7 +310,8 @@ if (XSS_DEMO_ENABLED) {
   });
 
   app.get('/demo/xss/comments', async (req: Request, res: Response) => {
-    const pagina = await formatarComentariosEmHtml(String(req.query.productId ?? ''));
+    const isSecureMode = Boolean(res.locals.isSecureMode);
+    const pagina = await formatarComentariosEmHtml(String(req.query.productId ?? ''), isSecureMode);
     res.type('html').send(pagina);
   });
 } else {
@@ -363,6 +418,7 @@ app.post('/api/auth/register', async (req: Request, res: Response) => {
 
     const token = randomUUID();
     sessoesPorToken.set(token, usuario.id);
+    configurarCookieSessao(req, res, token);
     res.status(201).json({ token, user: usuario });
   } catch (error) {
     console.error(error);
@@ -388,6 +444,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
 
     const token = randomUUID();
     sessoesPorToken.set(token, usuario.id);
+    configurarCookieSessao(req, res, token);
     res.json({
       token,
       user: {
@@ -425,7 +482,8 @@ app.post('/api/comments', async (req: Request, res: Response) => {
   }
 
   const { productId, content } = req.body;
-  const conteudo = String(content ?? '').trim();
+  const conteudoBruto = String(content ?? '').trim();
+  const conteudo = res.locals.isSecureMode ? xss(conteudoBruto) : conteudoBruto;
 
   if (!conteudo) {
     res.status(400).json({ error: 'Comentario nao pode estar vazio.' });

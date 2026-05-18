@@ -1,5 +1,6 @@
 import type { Usuario } from '../../types/domain';
 import { SearchBar } from '../molecules/SearchBar';
+import { useSecurityMode } from '../../context/SecurityModeContext';
 
 type AlvoNavegacao = 'home' | 'ofertas' | 'categorias' | 'contato' | 'login';
 
@@ -12,10 +13,20 @@ interface HeaderProps {
 }
 
 export const Header = ({ consulta, aoBuscar, navegacaoAtiva, aoNavegar, usuarioLogado }: HeaderProps) => {
+  const { isSecureMode, toggleSecureMode } = useSecurityMode();
+
   return (
     <header className="site-header">
       <div className="site-header__brand">
         <h1>Nexora Tech</h1>
+        <div className="security-mode">
+          <span className={`security-mode__badge ${isSecureMode ? 'is-secure' : 'is-vulnerable'}`}>
+            {isSecureMode ? 'Modo Seguro' : 'Modo Vulneravel'}
+          </span>
+          <button type="button" className="security-mode__toggle" onClick={toggleSecureMode}>
+            {isSecureMode ? 'Ativar modo vulneravel' : 'Ativar modo seguro'}
+          </button>
+        </div>
       </div>
 
       <div className="site-header__actions">

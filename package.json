@@ -17,11 +17,13 @@
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^5.2.1",
+    "helmet": "^8.1.0",
     "morgan": "^1.10.1",
     "prisma": "^7.4.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^7.9.5"
+    "react-router-dom": "^7.9.5",
+    "xss": "^1.0.15"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

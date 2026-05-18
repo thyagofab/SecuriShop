@@ -4,6 +4,7 @@ interface SecurityHintProps {
   titulo: string;
   dica: string;
   payload?: string;
+  aoAplicarPayload?: (payload: string) => void;
   owaspLabel?: string;
   owaspUrl?: string;
 }
@@ -12,6 +13,7 @@ export const SecurityHint = ({
   titulo,
   dica,
   payload,
+  aoAplicarPayload,
   owaspLabel = 'A03:2021 - Injection',
   owaspUrl = 'https://owasp.org/Top10/A03_2021-Injection/'
 }: SecurityHintProps) => {
@@ -42,6 +44,15 @@ export const SecurityHint = ({
             <div className="security-hint__payload">
               <span>Exemplo de payload:</span>
               <code>{payload}</code>
+              {aoAplicarPayload ? (
+                <button
+                  type="button"
+                  className="security-hint__apply"
+                  onClick={() => aoAplicarPayload(payload)}
+                >
+                  Aplicar payload
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>

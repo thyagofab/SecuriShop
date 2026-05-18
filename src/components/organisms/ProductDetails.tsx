@@ -3,7 +3,7 @@ import type { Product, Usuario } from '../../types/domain';
 import { Button } from '../atoms/Button';
 import { VulnerableHtml } from '../atoms/VulnerableHtml';
 import { CommentForm } from '../molecules/CommentForm';
-import { ENABLE_XSS_DEMO } from '../../config/env';
+import { useSecurityMode } from '../../context/SecurityModeContext';
 
 interface ProductDetailsProps {
   produto: Product & {
@@ -37,6 +37,8 @@ export const ProductDetails = ({
   mensagemComentario = ''
 }: ProductDetailsProps) => {
   const [avaliacao, setAvaliacao] = useState(4);
+  const { isSecureMode } = useSecurityMode();
+  const indicioComentarios = produto.comments.some((comentario) => /<|onerror|script/i.test(comentario.content));
   const handleImageError = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
     if (target.dataset.fallbackApplied === 'true') {
@@ -129,6 +131,14 @@ export const ProductDetails = ({
           desabilitado={!usuarioLogado || comentarioDesabilitado}
           mensagemBloqueio={mensagemComentario}
         />
+        {isSecureMode && indicioComentarios ? (
+          <div className="security-card security-card--safe">
+            <strong>Defesa ativa: comentario tratado como texto</strong>
+            <p>
+              O conteudo passou por sanitizacao no backend e foi renderizado como texto no frontend.
+            </p>
+          </div>
+        ) : null}
         {erroComentario ? <p className="auth-error">{erroComentario}</p> : null}
         {produto.comments.length === 0 ? (
           <p className="empty-state">Nenhum comentario ainda.</p>
@@ -138,7 +148,7 @@ export const ProductDetails = ({
               <p className="comment-meta">Comentado por: <strong>{comentario.user.username}</strong></p>
               <VulnerableHtml
                 content={comentario.content}
-                enabled={ENABLE_XSS_DEMO}
+                enabled={!isSecureMode}
                 className="comment-content"
               />
             </div>
