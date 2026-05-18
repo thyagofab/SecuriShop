@@ -22,22 +22,22 @@ export const Footer = () => {
         <section>
           <h4>Categorias em Destaque</h4>
           <ul>
-            <li><a href="#categories-section">Smartphones</a></li>
-            <li><a href="#categories-section">Notebooks</a></li>
-            <li><a href="#categories-section">Monitores</a></li>
-            <li><a href="#categories-section">Cadernos</a></li>
-            <li><a href="#categories-section">Perifericos</a></li>
-            <li><a href="#categories-section">Acessorios</a></li>
+            <li><a href="/#categories-section">Smartphones</a></li>
+            <li><a href="/#categories-section">Notebooks</a></li>
+            <li><a href="/#categories-section">Monitores</a></li>
+            <li><a href="/#categories-section">Cadernos</a></li>
+            <li><a href="/#categories-section">Perifericos</a></li>
+            <li><a href="/#categories-section">Acessorios</a></li>
           </ul>
         </section>
 
         <section>
           <h4>Informacoes</h4>
           <ul>
-            <li><a href="#quem-somos-section">Quem Somos</a></li>
-            <li><a href="#home-section">Termos de Uso</a></li>
-            <li><a href="#home-section">Politica de Privacidade</a></li>
-            <li><a href="#duvidas-section">Duvidas Frequentes</a></li>
+            <li><a href="/#quem-somos-section">Quem Somos</a></li>
+            <li><a href="/#home-section">Termos de Uso</a></li>
+            <li><a href="/#home-section">Politica de Privacidade</a></li>
+            <li><a href="/#duvidas-section">Duvidas Frequentes</a></li>
           </ul>
           <p>Projeto academico para demonstracao de seguranca web com foco em XSS.</p>
         </section>

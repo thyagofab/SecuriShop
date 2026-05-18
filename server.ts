@@ -1,8 +1,11 @@
+import 'dotenv/config';
 import express, { type Request, type Response } from 'express';
 import prismaPkg from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import cors from 'cors';
+import morgan from 'morgan';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
+import { seedDatabase } from './prisma/seedData';
 
 const { PrismaClient } = prismaPkg;
 
@@ -14,10 +17,43 @@ const prisma = new PrismaClient({ adapter });
 const app = express();
 const sessoesPorToken = new Map<string, number>();
 const armazenamentoDemoXss = new Map<string, string[]>();
+const PORT = Number(process.env.PORT ?? 3001);
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
+const XSS_DEMO_ENABLED =
+  !process.env.ENABLE_XSS_DEMO ||
+  !['false', '0', 'off'].includes(process.env.ENABLE_XSS_DEMO.toLowerCase());
 
-app.use(cors());
+const permitirOrigem = (origin: string | undefined) => {
+  if (!origin) {
+    return true;
+  }
+
+  if (origin === CLIENT_ORIGIN) {
+    return true;
+  }
+
+  return origin.startsWith('http://localhost:517');
+};
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      callback(null, permitirOrigem(origin));
+    }
+  })
+);
 
 app.use(express.json());
+app.use(morgan('dev'));
+
+if (XSS_DEMO_ENABLED) {
+  app.use((req, _res, next) => {
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+      console.log('[payload]', req.method, req.path, req.body);
+    }
+    next();
+  });
+}
 
 const hashSenha = (senha: string) => {
   const salt = randomBytes(16).toString('hex');
@@ -162,66 +198,72 @@ const formatarComentariosEmHtml = async (productId?: string) => {
   );
 };
 
-app.get('/demo/xss/search', async (req: Request, res: Response) => {
-  const termo = String(req.query.q ?? 'busca vazia');
-  const pagina = criarPaginaVulneravel(
-    'Busca vulneravel',
-    `<h1>Resultado da busca</h1>
-     <p>Voce pesquisou por: ${termo}</p>
-     <p>Esse campo e refletido diretamente no HTML para fins didaticos.</p>`
-  );
+if (XSS_DEMO_ENABLED) {
+  app.get('/demo/xss/search', async (req: Request, res: Response) => {
+    const termo = String(req.query.q ?? 'busca vazia');
+    const pagina = criarPaginaVulneravel(
+      'Busca vulneravel',
+      `<h1>Resultado da busca</h1>
+       <p>Voce pesquisou por: ${termo}</p>
+       <p>Esse campo e refletido diretamente no HTML para fins didaticos.</p>`
+    );
 
-  res.type('html').send(pagina);
-});
+    res.type('html').send(pagina);
+  });
 
-app.get('/demo/xss/reflected', async (req: Request, res: Response) => {
-  const payload = String(req.query.payload ?? req.query.q ?? 'valor-vazio');
-  const pagina = criarPaginaVulneravel(
-    'Reflected XSS demo',
-    `<h1>Reflected XSS</h1>
-     <p>Entrada refletida sem sanitizacao:</p>
-     <div id="resultado">${payload}</div>`
-  );
+  app.get('/demo/xss/reflected', async (req: Request, res: Response) => {
+    const payload = String(req.query.payload ?? req.query.q ?? 'valor-vazio');
+    const pagina = criarPaginaVulneravel(
+      'Reflected XSS demo',
+      `<h1>Reflected XSS</h1>
+       <p>Entrada refletida sem sanitizacao:</p>
+       <div id="resultado">${payload}</div>`
+    );
 
-  res.type('html').send(pagina);
-});
+    res.type('html').send(pagina);
+  });
 
-app.get('/demo/xss/stored', async (req: Request, res: Response) => {
-  const chave = String(req.query.key ?? req.query.productId ?? 'default');
-  const payload = req.query.payload ? String(req.query.payload) : undefined;
+  app.get('/demo/xss/stored', async (req: Request, res: Response) => {
+    const chave = String(req.query.key ?? req.query.productId ?? 'default');
+    const payload = req.query.payload ? String(req.query.payload) : undefined;
 
-  persistirDemoXss(chave, payload);
+    persistirDemoXss(chave, payload);
 
-  const itens = montarItensDemoXss(chave, 'Visitante');
-  const pagina = criarPaginaVulneravel(
-    'Stored XSS demo',
-    `<h1>Stored XSS</h1>
-     <p>Payload persistido em memoria e exibido sem sanitizacao.</p>
-     <ul>${itens || '<li>Nenhum payload armazenado.</li>'}</ul>`
-  );
+    const itens = montarItensDemoXss(chave, 'Visitante');
+    const pagina = criarPaginaVulneravel(
+      'Stored XSS demo',
+      `<h1>Stored XSS</h1>
+       <p>Payload persistido em memoria e exibido sem sanitizacao.</p>
+       <ul>${itens || '<li>Nenhum payload armazenado.</li>'}</ul>`
+    );
 
-  res.type('html').send(pagina);
-});
+    res.type('html').send(pagina);
+  });
 
-app.get('/demo/xss/dom', async (_req: Request, res: Response) => {
-  const pagina = criarPaginaVulneravel(
-    'DOM XSS demo',
-    `<h1>DOM-based XSS</h1>
-     <p>Use um payload no hash da URL (apos #).</p>
-     <div id="dom-target">Aguardando hash...</div>
-     <script>
-       const hash = window.location.hash.slice(1);
-       document.getElementById('dom-target').innerHTML = hash || 'Sem payload';
-     </script>`
-  );
+  app.get('/demo/xss/dom', async (_req: Request, res: Response) => {
+    const pagina = criarPaginaVulneravel(
+      'DOM XSS demo',
+      `<h1>DOM-based XSS</h1>
+       <p>Use um payload no hash da URL (apos #).</p>
+       <div id="dom-target">Aguardando hash...</div>
+       <script>
+         const hash = window.location.hash.slice(1);
+         document.getElementById('dom-target').innerHTML = hash || 'Sem payload';
+       </script>`
+    );
 
-  res.type('html').send(pagina);
-});
+    res.type('html').send(pagina);
+  });
 
-app.get('/demo/xss/comments', async (req: Request, res: Response) => {
-  const pagina = await formatarComentariosEmHtml(String(req.query.productId ?? ''));
-  res.type('html').send(pagina);
-});
+  app.get('/demo/xss/comments', async (req: Request, res: Response) => {
+    const pagina = await formatarComentariosEmHtml(String(req.query.productId ?? ''));
+    res.type('html').send(pagina);
+  });
+} else {
+  app.use('/demo/xss', (_req, res) => {
+    res.status(404).json({ error: 'Rotas de demonstracao desativadas.' });
+  });
+}
 
 app.get('/api/products', async (_req: Request, res: Response) => {
   try {
@@ -243,6 +285,42 @@ app.get('/api/products', async (_req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erro ao buscar produtos" });
+  }
+});
+
+app.get('/api/products/:id', async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: 'ID invalido.' });
+    return;
+  }
+
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        comments: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!product) {
+      res.status(404).json({ error: 'Produto nao encontrado.' });
+      return;
+    }
+
+    res.json(product);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao buscar produto.' });
   }
 });
 
@@ -378,7 +456,20 @@ app.post('/api/comments', async (req: Request, res: Response) => {
   }
 });
 
-const PORT = 3001;
+app.post('/api/admin/reset', async (_req: Request, res: Response) => {
+  if (!XSS_DEMO_ENABLED) {
+    res.status(403).json({ error: 'Modo demo desativado.' });
+    return;
+  }
+
+  try {
+    await seedDatabase(prisma);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao resetar banco.' });
+  }
+});
 app.listen(PORT, () => {
   console.log(`API Vulnerável do TCC rodando na porta ${PORT}`);
 });

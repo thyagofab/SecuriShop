@@ -3,6 +3,7 @@ import type { Product, Usuario } from '../../types/domain';
 import { Button } from '../atoms/Button';
 import { VulnerableHtml } from '../atoms/VulnerableHtml';
 import { CommentForm } from '../molecules/CommentForm';
+import { ENABLE_XSS_DEMO } from '../../config/env';
 
 interface ProductDetailsProps {
   produto: Product & {
@@ -13,11 +14,14 @@ interface ProductDetailsProps {
     buyLink: string;
   };
   aoVoltar: () => void;
-  aoAdicionarComentario: (idProduto: number, conteudo: string) => Promise<void>;
+  aoAdicionarComentario: (conteudo: string) => Promise<void>;
   usuarioLogado: Usuario | null;
   erroComentario: string;
   aoLogout: () => void;
   aoIrParaLogin: () => void;
+  aoIrParaCheckout: () => void;
+  comentarioDesabilitado?: boolean;
+  mensagemComentario?: string;
 }
 
 export const ProductDetails = ({
@@ -27,7 +31,10 @@ export const ProductDetails = ({
   usuarioLogado,
   erroComentario,
   aoLogout,
-  aoIrParaLogin
+  aoIrParaLogin,
+  aoIrParaCheckout,
+  comentarioDesabilitado = false,
+  mensagemComentario = ''
 }: ProductDetailsProps) => {
   const [avaliacao, setAvaliacao] = useState(4);
   const handleImageError = (event: React.SyntheticEvent<HTMLImageElement>) => {
@@ -81,6 +88,9 @@ export const ProductDetails = ({
             <a href={produto.buyLink} target="_blank" rel="noreferrer">
               <Button type="button" variant="primary">Ir para compra</Button>
             </a>
+            <Button type="button" variant="ghost" onClick={aoIrParaCheckout}>
+              Ir para checkout
+            </Button>
             <Button type="button" variant="ghost" onClick={aoVoltar}>
               Continuar navegando
             </Button>
@@ -115,8 +125,9 @@ export const ProductDetails = ({
         )}
 
         <CommentForm
-          aoEnviar={(conteudo) => aoAdicionarComentario(produto.id, conteudo)}
-          desabilitado={!usuarioLogado}
+          aoEnviar={(conteudo) => aoAdicionarComentario(conteudo)}
+          desabilitado={!usuarioLogado || comentarioDesabilitado}
+          mensagemBloqueio={mensagemComentario}
         />
         {erroComentario ? <p className="auth-error">{erroComentario}</p> : null}
         {produto.comments.length === 0 ? (
@@ -125,7 +136,11 @@ export const ProductDetails = ({
           produto.comments.map((comentario) => (
             <div key={comentario.id} className="comment-bubble">
               <p className="comment-meta">Comentado por: <strong>{comentario.user.username}</strong></p>
-              <VulnerableHtml content={comentario.content} className="comment-content" />
+              <VulnerableHtml
+                content={comentario.content}
+                enabled={ENABLE_XSS_DEMO}
+                className="comment-content"
+              />
             </div>
           ))
         )}

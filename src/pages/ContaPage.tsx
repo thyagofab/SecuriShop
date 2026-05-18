@@ -4,10 +4,12 @@ import { StoreTemplate } from '../components/templates/StoreTemplate';
 import { LoginPage } from './LoginPage';
 import { RegisterPage, type RegistroDados } from './RegisterPage';
 import type { Usuario } from '../types/domain';
-
-const API_BASE = 'http://localhost:3001/api';
-const CHAVE_TOKEN_LOCALSTORAGE = 'token_usuario_tcc';
-const CHAVE_COOKIE_SESSAO = 'token_usuario_tcc';
+import { API_BASE } from '../config/env';
+import {
+  CHAVE_COOKIE_SESSAO,
+  CHAVE_TOKEN_LOCALSTORAGE,
+  CHAVE_USUARIO_LOCALSTORAGE
+} from '../config/auth';
 
 type AlvoNavegacao = 'home' | 'ofertas' | 'categorias' | 'contato' | 'login';
 type PaginaAtiva = 'login' | 'register';
@@ -19,6 +21,9 @@ export const ContaPage = () => {
   const [erroAutenticacao, setErroAutenticacao] = useState('');
   const [mensagemSucesso, setMensagemSucesso] = useState('');
   const [paginaAtiva, setPaginaAtiva] = useState<PaginaAtiva>('login');
+  const [resetando, setResetando] = useState(false);
+  const [erroReset, setErroReset] = useState('');
+  const [sucessoReset, setSucessoReset] = useState('');
 
   useEffect(() => {
     const tokenArmazenado = localStorage.getItem(CHAVE_TOKEN_LOCALSTORAGE) ?? '';
@@ -33,7 +38,10 @@ export const ContaPage = () => {
           });
 
           if (!resposta.ok) {
-            localStorage.removeItem(CHAVE_TOKEN_LOCALSTORAGE);
+            if (resposta.status === 401 || resposta.status === 403) {
+              localStorage.removeItem(CHAVE_TOKEN_LOCALSTORAGE);
+              localStorage.removeItem(CHAVE_USUARIO_LOCALSTORAGE);
+            }
             return;
           }
 
@@ -41,8 +49,9 @@ export const ContaPage = () => {
           // Mantem cookie inseguro sincronizado para demonstracao de XSS.
           document.cookie = `${CHAVE_COOKIE_SESSAO}=${encodeURIComponent(tokenArmazenado)}; path=/; SameSite=Lax`;
           setUsuarioLogado(dados.user);
+          localStorage.setItem(CHAVE_USUARIO_LOCALSTORAGE, JSON.stringify(dados.user));
         } catch {
-          localStorage.removeItem(CHAVE_TOKEN_LOCALSTORAGE);
+          // Mantem token local em caso de falha de rede.
         }
       };
 
@@ -66,6 +75,7 @@ export const ContaPage = () => {
 
   const salvarSessao = (token: string, user: Usuario) => {
     localStorage.setItem(CHAVE_TOKEN_LOCALSTORAGE, token);
+    localStorage.setItem(CHAVE_USUARIO_LOCALSTORAGE, JSON.stringify(user));
     // Intencionalmente inseguro para demonstracao de XSS no TCC.
     document.cookie = `${CHAVE_COOKIE_SESSAO}=${encodeURIComponent(token)}; path=/; SameSite=Lax`;
     setUsuarioLogado(user);
@@ -153,8 +163,33 @@ export const ContaPage = () => {
 
   const fazerLogout = () => {
     localStorage.removeItem(CHAVE_TOKEN_LOCALSTORAGE);
+    localStorage.removeItem(CHAVE_USUARIO_LOCALSTORAGE);
     document.cookie = `${CHAVE_COOKIE_SESSAO}=; path=/; Max-Age=0; SameSite=Lax`;
     setUsuarioLogado(null);
+  };
+
+  const resetarBanco = async () => {
+    setResetando(true);
+    setErroReset('');
+    setSucessoReset('');
+
+    try {
+      const resposta = await fetch(`${API_BASE}/admin/reset`, {
+        method: 'POST'
+      });
+
+      if (!resposta.ok) {
+        const payload = (await resposta.json().catch(() => null)) as { error?: string } | null;
+        setErroReset(payload?.error ?? 'Erro ao resetar o banco.');
+        return;
+      }
+
+      setSucessoReset('Banco resetado com sucesso. Produtos e comentarios foram recriados.');
+    } catch {
+      setErroReset('Nao foi possivel resetar o banco. Confira se a API esta rodando.');
+    } finally {
+      setResetando(false);
+    }
   };
 
   return (
@@ -165,31 +200,54 @@ export const ContaPage = () => {
       aoNavegar={aoNavegar}
       usuarioLogado={usuarioLogado}
     >
-      {paginaAtiva === 'login' ? (
-        <LoginPage
-          usuarioLogado={usuarioLogado}
-          autenticando={autenticando}
-          erroAutenticacao={erroAutenticacao}
-          mensagemSucesso={mensagemSucesso}
-          aoLogin={fazerLogin}
-          aoRegistrar={fazerRegistro}
-          aoLogout={fazerLogout}
-          aoIrParaCadastro={() => {
-            setMensagemSucesso('');
-            setPaginaAtiva('register');
-          }}
-        />
-      ) : (
-        <RegisterPage
-          autenticando={autenticando}
-          erroAutenticacao={erroAutenticacao}
-          aoRegistrar={fazerRegistroCompleto}
-          aoVoltarLogin={() => {
-            setErroAutenticacao('');
-            setPaginaAtiva('login');
-          }}
-        />
-      )}
+      <>
+        {paginaAtiva === 'login' ? (
+          <LoginPage
+            usuarioLogado={usuarioLogado}
+            autenticando={autenticando}
+            erroAutenticacao={erroAutenticacao}
+            mensagemSucesso={mensagemSucesso}
+            aoLogin={fazerLogin}
+            aoRegistrar={fazerRegistro}
+            aoLogout={fazerLogout}
+            aoIrParaCadastro={() => {
+              setMensagemSucesso('');
+              setPaginaAtiva('register');
+            }}
+          />
+        ) : (
+          <RegisterPage
+            autenticando={autenticando}
+            erroAutenticacao={erroAutenticacao}
+            aoRegistrar={fazerRegistroCompleto}
+            aoVoltarLogin={() => {
+              setErroAutenticacao('');
+              setPaginaAtiva('login');
+            }}
+          />
+        )}
+
+        <section className="demo-panel" aria-label="Painel de demonstracao">
+          <div className="demo-panel__header">
+            <h3>Painel de demonstracao</h3>
+            <p>Reset rapido do banco para garantir dados reproduziveis durante o TCC.</p>
+          </div>
+          <div className="demo-panel__actions">
+            <button
+              type="button"
+              className="btn btn--danger"
+              onClick={() => {
+                void resetarBanco();
+              }}
+              disabled={resetando}
+            >
+              {resetando ? 'Resetando banco...' : 'Resetar banco e seed'}
+            </button>
+          </div>
+          {erroReset ? <p className="auth-error">{erroReset}</p> : null}
+          {sucessoReset ? <p className="auth-success">{sucessoReset}</p> : null}
+        </section>
+      </>
     </StoreTemplate>
   );
 };

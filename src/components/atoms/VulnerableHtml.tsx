@@ -3,9 +3,10 @@ import { useEffect, useRef } from 'react';
 interface VulnerableHtmlProps {
   content: string;
   className?: string;
+  enabled?: boolean;
 }
 
-export const VulnerableHtml = ({ content, className }: VulnerableHtmlProps) => {
+export const VulnerableHtml = ({ content, className, enabled = true }: VulnerableHtmlProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -14,6 +15,10 @@ export const VulnerableHtml = ({ content, className }: VulnerableHtmlProps) => {
       return;
     }
 
+    if (!enabled) {
+      container.textContent = content;
+      return;
+    }
 
     container.innerHTML = content;
 
@@ -26,7 +31,7 @@ export const VulnerableHtml = ({ content, className }: VulnerableHtmlProps) => {
       novoScript.text = scriptOriginal.text;
       scriptOriginal.replaceWith(novoScript);
     });
-  }, [content]);
+  }, [content, enabled]);
 
   return <div ref={containerRef} className={className} />;
 };
