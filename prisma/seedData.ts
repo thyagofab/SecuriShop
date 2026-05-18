@@ -150,13 +150,56 @@ const criarProdutoComComentarios = async (prisma: PrismaClient, dados: ProdutoSe
   });
 };
 
+const garantirUsuariosSeed = async (prisma: PrismaClient) => {
+  for (const usuario of USUARIOS) {
+    const existente = await prisma.user.findUnique({ where: { email: usuario.email } });
+    if (existente) {
+      continue;
+    }
+
+    await prisma.user.create({
+      data: {
+        username: usuario.username,
+        email: usuario.email,
+        password: hashSenha(usuario.password)
+      }
+    });
+  }
+};
+
+const aplicarComentariosSeed = async (prisma: PrismaClient) => {
+  for (const produto of PRODUTOS) {
+    const existente = await prisma.product.findFirst({ where: { name: produto.name } });
+    if (!existente) {
+      continue;
+    }
+
+    await prisma.comment.deleteMany({ where: { productId: existente.id } });
+
+    for (const comentario of produto.comments) {
+      const autor = await prisma.user.findUnique({ where: { username: comentario.username } });
+      if (!autor) {
+        continue;
+      }
+
+      await prisma.comment.create({
+        data: {
+          content: comentario.content,
+          productId: existente.id,
+          userId: autor.id
+        }
+      });
+    }
+  }
+};
+
 export const seedDatabase = async (prisma: PrismaClient) => {
   await prisma.comment.deleteMany();
   await prisma.user.deleteMany();
   await prisma.product.deleteMany();
 
   await prisma.$executeRawUnsafe(
-    'DELETE FROM sqlite_sequence WHERE name IN ("User", "Product", "Comment")'
+    "DELETE FROM sqlite_sequence WHERE name IN ('User', 'Product', 'Comment')"
   );
 
   await prisma.user.createMany({
@@ -170,4 +213,9 @@ export const seedDatabase = async (prisma: PrismaClient) => {
   for (const produto of PRODUTOS) {
     await criarProdutoComComentarios(prisma, produto);
   }
+};
+
+export const resetCommentsOnly = async (prisma: PrismaClient) => {
+  await garantirUsuariosSeed(prisma);
+  await aplicarComentariosSeed(prisma);
 };

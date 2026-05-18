@@ -184,7 +184,7 @@ export const ContaPage = () => {
         return;
       }
 
-      setSucessoReset('Banco resetado com sucesso. Produtos e comentarios foram recriados.');
+      setSucessoReset('Comentarios limpos com sucesso. Produtos foram mantidos.');
     } catch {
       setErroReset('Nao foi possivel resetar o banco. Confira se a API esta rodando.');
     } finally {
@@ -230,7 +230,7 @@ export const ContaPage = () => {
         <section className="demo-panel" aria-label="Painel de demonstracao">
           <div className="demo-panel__header">
             <h3>Painel de demonstracao</h3>
-            <p>Reset rapido do banco para garantir dados reproduziveis durante o TCC.</p>
+            <p>Limpeza rapida dos comentarios para repetir os testes de ataque.</p>
           </div>
           <div className="demo-panel__actions">
             <button
@@ -241,7 +241,7 @@ export const ContaPage = () => {
               }}
               disabled={resetando}
             >
-              {resetando ? 'Resetando banco...' : 'Resetar banco e seed'}
+              {resetando ? 'Limpando comentarios...' : 'Limpar comentarios de ataque'}
             </button>
           </div>
           {erroReset ? <p className="auth-error">{erroReset}</p> : null}

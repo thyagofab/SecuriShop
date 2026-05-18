@@ -5,7 +5,7 @@ import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import cors from 'cors';
 import morgan from 'morgan';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
-import { seedDatabase } from './prisma/seedData';
+import { resetCommentsOnly, seedDatabase } from './prisma/seedData';
 
 const { PrismaClient } = prismaPkg;
 
@@ -463,7 +463,7 @@ app.post('/api/admin/reset', async (_req: Request, res: Response) => {
   }
 
   try {
-    await seedDatabase(prisma);
+    await resetCommentsOnly(prisma);
     res.json({ ok: true });
   } catch (error) {
     console.error(error);
