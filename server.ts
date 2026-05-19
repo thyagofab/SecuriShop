@@ -197,13 +197,20 @@ const obterListaDemoXss = (chave: string) => {
   return armazenamentoDemoXss.get(chave)!;
 };
 
+const sanitizeStrict = (payload: string) =>
+  xss(payload, {
+    whiteList: {},
+    stripIgnoreTag: true,
+    stripIgnoreTagBody: ['script']
+  });
+
 const persistirDemoXss = (chave: string, payload?: string, isSecureMode = false) => {
   if (!payload) {
     return;
   }
 
   const lista = obterListaDemoXss(chave);
-  const conteudo = isSecureMode ? xss(payload) : payload;
+  const conteudo = isSecureMode ? sanitizeStrict(payload) : payload;
   lista.unshift(conteudo);
   if (lista.length > 25) {
     lista.length = 25;
@@ -233,8 +240,12 @@ const formatarComentariosEmHtml = async (productId?: string, isSecureMode = fals
 
   const itens = comments
     .map((comment) => {
-      const usuario = isSecureMode ? xss(comment.user.username) : comment.user.username;
-      const conteudo = isSecureMode ? xss(comment.content) : comment.content;
+      const usuario = isSecureMode
+        ? sanitizeStrict(comment.user.username)
+        : comment.user.username;
+      const conteudo = isSecureMode
+        ? sanitizeStrict(comment.content)
+        : comment.content;
       return `<li><strong>${usuario}</strong>: <span>${conteudo}</span></li>`;
     })
     .join('\n');
@@ -251,7 +262,7 @@ if (XSS_DEMO_ENABLED) {
   app.get('/demo/xss/search', async (req: Request, res: Response) => {
     const isSecureMode = Boolean(res.locals.isSecureMode);
     const termo = String(req.query.q ?? 'busca vazia');
-    const termoSeguro = isSecureMode ? xss(termo) : termo;
+    const termoSeguro = isSecureMode ? sanitizeStrict(termo) : termo;
     const pagina = criarPaginaVulneravel(
       'Busca vulneravel',
       `<h1>Resultado da busca</h1>
@@ -265,7 +276,7 @@ if (XSS_DEMO_ENABLED) {
   app.get('/demo/xss/reflected', async (req: Request, res: Response) => {
     const isSecureMode = Boolean(res.locals.isSecureMode);
     const payload = String(req.query.payload ?? req.query.q ?? 'valor-vazio');
-    const payloadSeguro = isSecureMode ? xss(payload) : payload;
+    const payloadSeguro = isSecureMode ? sanitizeStrict(payload) : payload;
     const pagina = criarPaginaVulneravel(
       'Reflected XSS demo',
       `<h1>Reflected XSS</h1>
