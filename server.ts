@@ -308,15 +308,18 @@ if (XSS_DEMO_ENABLED) {
   app.get('/demo/xss/dom', async (_req: Request, res: Response) => {
     const isSecureMode = Boolean(res.locals.isSecureMode);
     const domScript = isSecureMode
-      ? `const hash = window.location.hash.slice(1);
-         document.getElementById('dom-target').textContent = hash || 'Sem payload';`
+      ? ''
       : `const hash = window.location.hash.slice(1);
          document.getElementById('dom-target').innerHTML = hash || 'Sem payload';`;
+    const domTextoSeguro = isSecureMode
+      ? '<p><strong>Modo seguro ativo:</strong> leitura do hash desativada.</p>'
+      : '';
     const pagina = criarPaginaVulneravel(
       'DOM XSS demo',
       `<h1>DOM-based XSS</h1>
        <p>Use um payload no hash da URL (apos #).</p>
        <div id="dom-target">Aguardando hash...</div>
+       ${domTextoSeguro}
        <script>
          ${domScript}
        </script>`
