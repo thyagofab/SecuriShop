@@ -63,6 +63,51 @@
   max-width: 300px;
 }
 
+.security-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.security-mode__badge {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.security-mode__badge.is-secure {
+  background: rgba(15, 118, 110, 0.12);
+  border-color: rgba(15, 118, 110, 0.4);
+  color: #0f766e;
+}
+
+.security-mode__badge.is-vulnerable {
+  background: rgba(209, 79, 60, 0.12);
+  border-color: rgba(209, 79, 60, 0.4);
+  color: #b42318;
+}
+
+.security-mode__toggle {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.security-mode__toggle:hover {
+  border-color: var(--brand-strong);
+  color: var(--brand-strong);
+}
+
 .logo-slot {
   width: 80px;
   height: 80px;
@@ -415,7 +460,7 @@
   max-width: 61ch;
 }
 
-.quem-somos-v2__content p + p {
+.quem-somos-v2__content p+p {
   margin-top: 18px;
 }
 
@@ -1345,6 +1390,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1601,6 +1647,59 @@
   border-radius: 6px;
 }
 
+.security-hint__apply {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 11px;
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  width: fit-content;
+}
+
+.security-hint__apply:hover {
+  border-color: var(--ink);
+}
+
+.security-toast {
+  position: sticky;
+  top: 16px;
+  z-index: 20;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #fff4d6;
+  border: 1px solid #f4c36c;
+  color: #6b3f00;
+  font-size: 12px;
+}
+
+.security-card {
+  margin: 14px 0 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #f4f8ff;
+}
+
+.security-card--safe {
+  border-color: rgba(15, 118, 110, 0.35);
+  background: rgba(15, 118, 110, 0.08);
+}
+
+.security-card strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.security-card p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .phishing-banner {
   margin: 20px 0 30px;
   border-radius: 16px;
@@ -1718,6 +1817,12 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.demo-panel__note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .demo-panel__hint {

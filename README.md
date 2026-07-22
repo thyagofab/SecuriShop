@@ -127,38 +127,28 @@ No painel da AWS:
 
 ---
 
-### Atualizar IP no projeto
+### Criar arquivo .env com os enderecos corretos
+
+Crie um arquivo `.env` na raiz do projeto com as variaveis abaixo, substituindo `SEU_IP_PUBLICO`:
 
 ```bash
-sed -i "s|http://localhost:3001|http://SEU_IP_PUBLICO:3001|g" src/pages/HomePage.tsx src/pages/ContaPage.tsx
-```
+cat > .env << 'EOF'
+PORT=3001
+CLIENT_ORIGIN=http://SEU_IP_PUBLICO:5173
+ENABLE_XSS_DEMO=true
 
----
-
-### Verificar atualização
-
-```bash
-grep "API_BASE" src/pages/HomePage.tsx src/pages/ContaPage.tsx
-```
-
----
-
-### Configurar Vite para acesso externo
-
-```bash
-cat > vite.config.ts << 'EOF'
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: '0.0.0.0',
-    port: 5173,
-  }
-})
+VITE_API_BASE_URL=http://SEU_IP_PUBLICO:3001/api
+VITE_ENABLE_XSS_DEMO=true
 EOF
 ```
+
+Opcional: se quiser desativar os endpoints didaticos de XSS, defina `ENABLE_XSS_DEMO=false` e `VITE_ENABLE_XSS_DEMO=false`.
+
+---
+
+### Observacao sobre o Vite em EC2
+
+O Vite precisa ser iniciado com `--host 0.0.0.0` para aceitar conexoes externas. Isso e feito no comando de execucao (sem editar o arquivo `vite.config.ts`).
 
 ---
 
@@ -168,7 +158,7 @@ EOF
 
 ```bash
 cd ~/xss-tcc
-npx tsx server.ts
+npm run dev:server
 ```
 
 Mensagem esperada:
@@ -185,15 +175,17 @@ Se usar Yarn:
 
 ```bash
 cd ~/xss-tcc
-yarn run dev
+yarn run dev:web -- --host 0.0.0.0 --port 5173
 ```
 
 Se usar npm:
 
 ```bash
 cd ~/xss-tcc
-npm run dev
+npm run dev:web -- --host 0.0.0.0 --port 5173
 ```
+
+Opcional (uso local): para subir tudo em um terminal so, use `npm run dev`.
 
 ---
 

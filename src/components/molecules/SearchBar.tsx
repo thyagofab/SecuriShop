@@ -2,7 +2,7 @@ import { useRef, type FormEvent } from 'react';
 import { Button } from '../atoms/Button';
 import { TextInput } from '../atoms/TextInput';
 import { SecurityHint } from '../atoms/SecurityHint';
-import { ENABLE_XSS_DEMO } from '../../config/env';
+import { useSecurityMode } from '../../context/SecurityModeContext';
 
 interface SearchBarProps {
   consultaInicial?: string;
@@ -11,6 +11,7 @@ interface SearchBarProps {
 
 export const SearchBar = ({ consultaInicial = '', aoBuscar }: SearchBarProps) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { isSecureMode } = useSecurityMode();
 
   const aoEnviar = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -33,11 +34,17 @@ export const SearchBar = ({ consultaInicial = '', aoBuscar }: SearchBarProps) =>
         <SecurityHint
           titulo="Campo vulneravel a XSS refletido"
           dica={
-            ENABLE_XSS_DEMO
-              ? 'A API reflete esse termo sem sanitizacao. Tente injetar HTML ou script.'
-              : 'Modo seguro ativo. O termo e exibido como texto simples.'
+            isSecureMode
+              ? 'Modo seguro ativo. O termo e exibido como texto simples.'
+              : 'A API reflete esse termo sem sanitizacao. Tente injetar HTML ou script.'
           }
           payload="<script>alert(1)</script>"
+          aoAplicarPayload={(payload) => {
+            if (inputRef.current) {
+              inputRef.current.value = payload;
+              inputRef.current.focus();
+            }
+          }}
         />
       </div>
       <Button type="submit" variant="primary">

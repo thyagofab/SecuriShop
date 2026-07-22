@@ -1,18 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import { API_BASE } from '../config/env';
 import type { Product } from '../types/domain';
+import { useSecurityMode } from '../context/SecurityModeContext';
 
 export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { isSecureMode } = useSecurityMode();
 
   const carregarProdutos = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      const resposta = await fetch(`${API_BASE}/products`);
+      const resposta = await fetch(`${API_BASE}/products`, {
+        headers: {
+          'X-Secure-Mode': isSecureMode ? 'true' : 'false'
+        },
+        credentials: 'include'
+      });
       if (!resposta.ok) {
         throw new Error('Nao foi possivel carregar os produtos.');
       }
@@ -24,7 +31,7 @@ export const useProducts = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isSecureMode]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

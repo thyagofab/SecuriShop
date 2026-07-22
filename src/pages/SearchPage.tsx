@@ -5,7 +5,7 @@ import { ProductCard } from '../components/organisms/ProductCard';
 import { VulnerableHtml } from '../components/atoms/VulnerableHtml';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { useProducts } from '../hooks/useProducts';
-import { ENABLE_XSS_DEMO } from '../config/env';
+import { useSecurityMode } from '../context/SecurityModeContext';
 import { formatarProdutoCatalogo, PRODUTOS_EXTRAS } from '../data/catalog';
 import type { CatalogProduct } from '../types/catalog';
 
@@ -28,6 +28,8 @@ export const SearchPage = () => {
   const consulta = searchParams.get('q') ?? '';
   const { usuarioLogado } = useAuthSession();
   const { products, loading, error } = useProducts();
+  const { isSecureMode } = useSecurityMode();
+  const indicioPayload = /<|onerror|script/i.test(consulta);
 
   const produtosCatalogo = useMemo(
     () => [...products, ...PRODUTOS_EXTRAS].map(formatarProdutoCatalogo),
@@ -95,11 +97,20 @@ export const SearchPage = () => {
       {consulta ? (
         <section className="status-text">
           <p>Busca atual (XSS Refletido):</p>
-          <VulnerableHtml content={consulta} enabled={ENABLE_XSS_DEMO} className="comment-content" />
+          <VulnerableHtml content={consulta} enabled={!isSecureMode} className="comment-content" />
         </section>
       ) : (
         <p className="status-text">Digite algo na busca para listar resultados.</p>
       )}
+
+      {isSecureMode && consulta && indicioPayload ? (
+        <div className="security-card security-card--safe">
+          <strong>Defesa ativa: escape de saida no React</strong>
+          <p>
+            O termo foi tratado como texto, impedindo a interpretacao de HTML ou scripts no navegador.
+          </p>
+        </div>
+      ) : null}
 
       {loading ? <p className="status-text">Carregando produtos...</p> : null}
       {error ? <p className="status-text status-text--error">{error}</p> : null}

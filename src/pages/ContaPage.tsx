@@ -10,6 +10,7 @@ import {
   CHAVE_TOKEN_LOCALSTORAGE,
   CHAVE_USUARIO_LOCALSTORAGE
 } from '../config/auth';
+import { useSecurityMode } from '../context/SecurityModeContext';
 
 type AlvoNavegacao = 'home' | 'ofertas' | 'categorias' | 'contato' | 'login';
 type PaginaAtiva = 'login' | 'register';
@@ -24,6 +25,7 @@ export const ContaPage = () => {
   const [resetando, setResetando] = useState(false);
   const [erroReset, setErroReset] = useState('');
   const [sucessoReset, setSucessoReset] = useState('');
+  const { isSecureMode } = useSecurityMode();
 
   useEffect(() => {
     const tokenArmazenado = localStorage.getItem(CHAVE_TOKEN_LOCALSTORAGE) ?? '';
@@ -33,8 +35,10 @@ export const ContaPage = () => {
         try {
           const resposta = await fetch(`${API_BASE}/auth/me`, {
             headers: {
-              Authorization: `Bearer ${tokenArmazenado}`
-            }
+              Authorization: `Bearer ${tokenArmazenado}`,
+              'X-Secure-Mode': isSecureMode ? 'true' : 'false'
+            },
+            credentials: 'include'
           });
 
           if (!resposta.ok) {
@@ -46,8 +50,10 @@ export const ContaPage = () => {
           }
 
           const dados = (await resposta.json()) as { user: Usuario };
-          // Mantem cookie inseguro sincronizado para demonstracao de XSS.
-          document.cookie = `${CHAVE_COOKIE_SESSAO}=${encodeURIComponent(tokenArmazenado)}; path=/; SameSite=Lax`;
+          if (!isSecureMode) {
+            // Mantem cookie inseguro sincronizado para demonstracao de XSS.
+            document.cookie = `${CHAVE_COOKIE_SESSAO}=${encodeURIComponent(tokenArmazenado)}; path=/; SameSite=Lax`;
+          }
           setUsuarioLogado(dados.user);
           localStorage.setItem(CHAVE_USUARIO_LOCALSTORAGE, JSON.stringify(dados.user));
         } catch {
@@ -57,7 +63,7 @@ export const ContaPage = () => {
 
       void carregarSessao();
     }
-  }, []);
+  }, [isSecureMode]);
 
   const aoBuscar = (termoBusca: string) => {
     const query = termoBusca.trim();
@@ -76,8 +82,10 @@ export const ContaPage = () => {
   const salvarSessao = (token: string, user: Usuario) => {
     localStorage.setItem(CHAVE_TOKEN_LOCALSTORAGE, token);
     localStorage.setItem(CHAVE_USUARIO_LOCALSTORAGE, JSON.stringify(user));
-    // Intencionalmente inseguro para demonstracao de XSS no TCC.
-    document.cookie = `${CHAVE_COOKIE_SESSAO}=${encodeURIComponent(token)}; path=/; SameSite=Lax`;
+    if (!isSecureMode) {
+      // Intencionalmente inseguro para demonstracao de XSS no TCC.
+      document.cookie = `${CHAVE_COOKIE_SESSAO}=${encodeURIComponent(token)}; path=/; SameSite=Lax`;
+    }
     setUsuarioLogado(user);
     setErroAutenticacao('');
     setMensagemSucesso('');
@@ -99,7 +107,11 @@ export const ContaPage = () => {
     try {
       const resposta = await fetch(`${API_BASE}/auth/${rota}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Secure-Mode': isSecureMode ? 'true' : 'false'
+        },
+        credentials: 'include',
         body: JSON.stringify({ username: email, password: senha, email })
       });
 
@@ -134,7 +146,11 @@ export const ContaPage = () => {
     try {
       const resposta = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Secure-Mode': isSecureMode ? 'true' : 'false'
+        },
+        credentials: 'include',
         body: JSON.stringify({
           username: dados.email,
           password: dados.senha,
@@ -164,7 +180,9 @@ export const ContaPage = () => {
   const fazerLogout = () => {
     localStorage.removeItem(CHAVE_TOKEN_LOCALSTORAGE);
     localStorage.removeItem(CHAVE_USUARIO_LOCALSTORAGE);
-    document.cookie = `${CHAVE_COOKIE_SESSAO}=; path=/; Max-Age=0; SameSite=Lax`;
+    if (!isSecureMode) {
+      document.cookie = `${CHAVE_COOKIE_SESSAO}=; path=/; Max-Age=0; SameSite=Lax`;
+    }
     setUsuarioLogado(null);
   };
 
@@ -175,7 +193,11 @@ export const ContaPage = () => {
 
     try {
       const resposta = await fetch(`${API_BASE}/admin/reset`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'X-Secure-Mode': isSecureMode ? 'true' : 'false'
+        },
+        credentials: 'include'
       });
 
       if (!resposta.ok) {
@@ -246,6 +268,29 @@ export const ContaPage = () => {
           </div>
           {erroReset ? <p className="auth-error">{erroReset}</p> : null}
           {sucessoReset ? <p className="auth-success">{sucessoReset}</p> : null}
+        </section>
+
+        <section className="demo-panel" aria-label="Simulacao de roubo de sessao">
+          <div className="demo-panel__header">
+            <h3>Simular roubo de cookie</h3>
+            <p>Mostra o que um script teria acesso ao ler document.cookie.</p>
+          </div>
+          <div className="demo-panel__actions">
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => {
+                alert(`Conteudo de document.cookie:\n\n${document.cookie || '(vazio)'}`);
+              }}
+            >
+              Simular roubo de cookie
+            </button>
+          </div>
+          <p className="demo-panel__note">
+            {isSecureMode
+              ? 'Modo seguro: cookies HttpOnly nao aparecem aqui.'
+              : 'Modo vulneravel: o token de sessao pode aparecer aqui.'}
+          </p>
         </section>
       </>
     </StoreTemplate>

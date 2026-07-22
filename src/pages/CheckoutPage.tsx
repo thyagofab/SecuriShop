@@ -3,8 +3,8 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { StoreTemplate } from '../components/templates/StoreTemplate';
 import { SecurityHint } from '../components/atoms/SecurityHint';
 import { VulnerableHtml } from '../components/atoms/VulnerableHtml';
-import { ENABLE_XSS_DEMO } from '../config/env';
 import { useAuthSession } from '../hooks/useAuthSession';
+import { useSecurityMode } from '../context/SecurityModeContext';
 
 const TOTAL_PADRAO = 'R$ 3.499,00';
 
@@ -13,6 +13,7 @@ export const CheckoutPage = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { usuarioLogado } = useAuthSession();
+  const { isSecureMode } = useSecurityMode();
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [endereco, setEndereco] = useState('');
@@ -44,6 +45,8 @@ export const CheckoutPage = () => {
 
     return 'Endereco nao informado.';
   }, [endereco, enderecoUrl]);
+
+  const indicioPayload = /<|onerror|script/i.test(`${totalExibido} ${resumoEndereco}`);
 
   const aoBuscar = (termoBusca: string) => {
     const query = termoBusca.trim();
@@ -128,25 +131,33 @@ export const CheckoutPage = () => {
             <SecurityHint
               titulo="Campo vulneravel ao DOM-based XSS"
               dica={
-                ENABLE_XSS_DEMO
-                  ? 'O total e lido diretamente da URL e inserido no DOM sem sanitizacao.'
-                  : 'Modo seguro ativo. O total e exibido como texto simples.'
+                isSecureMode
+                  ? 'Modo seguro ativo. O total e exibido como texto simples.'
+                  : 'O total e lido diretamente da URL e inserido no DOM sem sanitizacao.'
               }
               payload="<script>alert('total')</script>"
             />
           </div>
           <div className="checkout-summary__row">
             <span>Total exibido</span>
-            <VulnerableHtml content={totalExibido} enabled={ENABLE_XSS_DEMO} className="checkout-total" />
+            <VulnerableHtml content={totalExibido} enabled={!isSecureMode} className="checkout-total" />
           </div>
           <div className="checkout-summary__row">
             <span>Endereco informado</span>
-            <VulnerableHtml content={resumoEndereco} enabled={ENABLE_XSS_DEMO} className="checkout-address" />
+            <VulnerableHtml content={resumoEndereco} enabled={!isSecureMode} className="checkout-address" />
           </div>
           <div className="checkout-summary__hint">
             <p>Teste com: <code>#&lt;script&gt;alert('XSS')&lt;/script&gt;</code></p>
             <p>Ou use: <code>?total=R$99,90&amp;endereco=&lt;img src=x onerror=alert(1)&gt;</code></p>
           </div>
+          {isSecureMode && indicioPayload ? (
+            <div className="security-card security-card--safe">
+              <strong>Defesa ativa: texto seguro no DOM</strong>
+              <p>
+                Os valores vindos da URL foram exibidos como texto, evitando execucao de HTML.
+              </p>
+            </div>
+          ) : null}
         </aside>
       </section>
     </StoreTemplate>

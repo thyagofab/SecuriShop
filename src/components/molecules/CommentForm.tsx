@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '../atoms/Button';
 import { TextInput } from '../atoms/TextInput';
 import { SecurityHint } from '../atoms/SecurityHint';
-import { ENABLE_XSS_DEMO } from '../../config/env';
+import { useSecurityMode } from '../../context/SecurityModeContext';
 
 interface CommentFormProps {
   aoEnviar: (conteudo: string) => Promise<void>;
@@ -13,6 +13,7 @@ interface CommentFormProps {
 export const CommentForm = ({ aoEnviar, desabilitado = false, mensagemBloqueio }: CommentFormProps) => {
   const [conteudo, setConteudo] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const { isSecureMode } = useSecurityMode();
   const placeholder = desabilitado
     ? mensagemBloqueio || 'Faca login para comentar'
     : 'Deixe um comentario';
@@ -47,11 +48,14 @@ export const CommentForm = ({ aoEnviar, desabilitado = false, mensagemBloqueio }
         <SecurityHint
           titulo="Campo vulneravel a XSS armazenado"
           dica={
-            ENABLE_XSS_DEMO
-              ? 'Comentarios sao renderizados sem sanitizacao. Scripts executam quando alguem abre o produto.'
-              : 'Modo seguro ativo. Comentarios sao exibidos como texto.'
+            isSecureMode
+              ? 'Modo seguro ativo. Comentarios sao exibidos como texto.'
+              : 'Comentarios sao renderizados sem sanitizacao. Scripts executam quando alguem abre o produto.'
           }
           payload="<img src=x onerror=alert('xss') />"
+          aoAplicarPayload={(payload) => {
+            setConteudo(payload);
+          }}
         />
       </div>
       <Button type="submit" variant="danger" size="sm" disabled={salvando || desabilitado}>

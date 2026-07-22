@@ -6,6 +6,7 @@ import { useAuthSession } from '../hooks/useAuthSession';
 import { useProducts } from '../hooks/useProducts';
 import { API_BASE } from '../config/env';
 import { formatarProdutoCatalogo, PRODUTOS_EXTRAS } from '../data/catalog';
+import { useSecurityMode } from '../context/SecurityModeContext';
 
 export const ProductPage = () => {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export const ProductPage = () => {
   const { usuarioLogado, tokenSessao, logout } = useAuthSession();
   const { products, loading, error, reload } = useProducts();
   const [erroComentario, setErroComentario] = useState('');
+  const { isSecureMode } = useSecurityMode();
 
   const produtosCatalogo = useMemo(
     () => [...products, ...PRODUTOS_EXTRAS].map(formatarProdutoCatalogo),
@@ -78,8 +80,10 @@ export const ProductPage = () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${tokenSessao}`
+        Authorization: `Bearer ${tokenSessao}`,
+        'X-Secure-Mode': isSecureMode ? 'true' : 'false'
       },
+      credentials: 'include',
       body: JSON.stringify({ productId: idProduto, content: conteudo })
     });
 
